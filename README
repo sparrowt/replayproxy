@@ -1,0 +1,26 @@
+= Usage =
+`replayproxy.py [-h] [-H HOST] [-p PORT] FILENAME`
+
+positional arguments:
+  FILENAME    Path to the .pcap file to parse
+
+optional arguments:
+        *-H HOST     IP to start the proxy on (DEFAULT: 127.0.0.1)
+        *-p PORT     Port to listen on (DEFAULT: 3128)
+        *-v LEVEL    Verbose output (DEFAULT LEVEL: 1)
+
+= Functionality =
+replayproxy:
+	* parses HTTP streams from .pcap files
+	* opens a TCP socket on port 3128 and listens as a HTTP proxy using the extracted HTTP responses as a cache while refusing all requests for unknown URLs
+
+= Dependencies =
+	* Python 2.7+
+	* dpkt library (http://code.google.com/p/dpkt/)
+	* pynids library (http://jon.oberheide.org/pynids/)
+
+= Tips/Tricks =
+	* to capture .pcap files you can e.g. use tcpdump integrated in most linux distributions or Wireshark
+
+= Testing ReplayProxy =
+replayproxy.zip contains the file test.pcap, which contains a capture of a visit of the Honeynet Project homepage  (http://www.honeynet.org)
