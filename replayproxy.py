@@ -120,8 +120,9 @@ def processTcpStream(tcp):
                 hdr_len = client_data.find('\r\n\r\n')
                 client_data = client_data[body_len + hdr_len + 4:]
             else:
-                hdr_body_len = client_data.find("HTTP/1")
-                client_data = client_data[hdr_body_len]
+                hdr_len = client_data.find('\r\n\r\n')
+                body_len = client_data[hdr_len:].find("HTTP/1")
+                client_data = client_data[hdr_len + body_len:]
 
             if not resources.has_key(full_uri):
                 resources[full_uri] = []
