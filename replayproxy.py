@@ -102,7 +102,7 @@ def processTcpStream(tcp):
         server_data= tcp.server.data[:tcp.server.count]
         # data to client
         client_data = tcp.client.data[:tcp.client.count]
-    
+
         # extract *all* the requests in this stream
         req = ""
         while len(req) < len(server_data):
@@ -252,11 +252,14 @@ def main():
     nids.param("filename", args.PCAP)
     nids.init()
     nids.register_tcp(reassembleTcpStream)
+    logging.info("Processing TCP streams...")
     nids.run()
+
     # process the open streams, which are not processed by pynids
+    logging.info("Processing open streams...")
     for c, stream in openstreams.items():
         processTcpStream(stream)
-    
+
     # run proxy server
     server = ProxyServer( (HOST,PORT), ProxyRequestHandler)
     server.allow_reuse_address = True
