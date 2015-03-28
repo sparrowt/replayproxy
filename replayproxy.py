@@ -106,29 +106,36 @@ def processTcpStream(tcp):
         # extract *all* the requests in this stream
         req = ""
         while len(req) < len(server_data):
-            req = dpkt.http.Request(server_data)
-            host_hdr = req.headers['host']
-            full_uri = req.uri if req.uri.startswith("http://") else \
-                "http://%s:%d%s" % (host_hdr, dport, req.uri) if dport != 80 else \
-                "http://%s%s" % (host_hdr, req.uri)
-            logging.info(full_uri)
+            req_parsed = False
+            try:
+                req = dpkt.http.Request(server_data)
+                req_parsed = True
+                host_hdr = req.headers['host']
+                full_uri = req.uri if req.uri.startswith("http://") else \
+                    "http://%s:%d%s" % (host_hdr, dport, req.uri) if dport != 80 else \
+                    "http://%s%s" % (host_hdr, req.uri)
+                logging.info(full_uri)
 
-            res = dpkt.http.Response(client_data)
-            logging.debug(res)
-            if res.headers.has_key("content-length"):
-                body_len = int(res.headers["content-length"])
-                hdr_len = client_data.find('\r\n\r\n')
-                client_data = client_data[body_len + hdr_len + 4:]
-            else:
-                hdr_len = client_data.find('\r\n\r\n')
-                body_len = client_data[hdr_len:].find("HTTP/1")
-                client_data = client_data[hdr_len + body_len:]
+                res = dpkt.http.Response(client_data)
+                logging.debug(res)
+                if res.headers.has_key("content-length"):
+                    body_len = int(res.headers["content-length"])
+                    hdr_len = client_data.find('\r\n\r\n')
+                    client_data = client_data[body_len + hdr_len + 4:]
+                else:
+                    hdr_len = client_data.find('\r\n\r\n')
+                    body_len = client_data[hdr_len:].find("HTTP/1")
+                    client_data = client_data[hdr_len + body_len:]
 
-            if not resources.has_key(full_uri):
-                resources[full_uri] = []
-            resources[full_uri].append(res)
+                if not resources.has_key(full_uri):
+                    resources[full_uri] = []
+                resources[full_uri].append(res)
 
-            server_data = server_data[len(req):]
+                server_data = server_data[len(req):]
+            except Exception as ex:
+                logging.error("Failed to parse {}. Exception: ".format("response" if req_parsed else "request", str(ex)))
+                logging.error("Stopping processing of TCP stream %s:%s -> %s:%s" % (src,sport,dst,dport))
+                break
 
 def get_resource(uri):
     # exact match?
