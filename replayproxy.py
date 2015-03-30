@@ -35,7 +35,7 @@
 #           * parse HTTP streams from .pcap files
 #           * open a TCP socket and listen as a HTTP proxy using the extracted HTTP responses as a cache while refusing all requests for unknown URLs
 # Author:   Armin Buescher (armin.buescher@googlemail.com)
-# Contribs: Marco Cova (marco@lastline.com)
+# Contribs: Marco Cova (marco@lastline.com), Tom Sparrow (sparrowt@gmail.com)
 # Thx to:   Andrew Brampton (brampton@gmail.com) for his example code on how to parse HTTP streams from .pcap files using dpkg
 #
 ###################################################################################################
@@ -45,6 +45,10 @@
 #   - tcpreassembly via pynids
 #   - initial support for non-exact matches
 #   - general refactoring
+#
+# 1.2 (Tom Sparrow, sparrowt@gmail.com)
+#   - fix handling of missing content-length header
+#   - handle request/response parse errors and continue
 #
 ###################################################################################################
 
