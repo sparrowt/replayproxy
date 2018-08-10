@@ -57,8 +57,6 @@ import dpkt
 import gzip
 import logging
 import nids
-import re
-import socket
 import sys
 import urlparse
 import SocketServer
@@ -79,6 +77,7 @@ resources = {}
 # using the regular pynids API
 openstreams = {}
 
+
 def reassembleTcpStream(tcp):
 
     if tcp.nids_state == nids.NIDS_JUST_EST:
@@ -91,7 +90,7 @@ def reassembleTcpStream(tcp):
         # keep all of the stream's new data
         tcp.discard(0)
 
-        openstreams[tcp.addr] = tcp 
+        openstreams[tcp.addr] = tcp
     elif tcp.nids_state in END_STATES:
         del openstreams[tcp.addr]
 
@@ -99,11 +98,17 @@ def reassembleTcpStream(tcp):
     else:
         print >>sys.stderr, "Unknown nids state"
 
+
 def processTcpStream(tcp):
         ((src, sport), (dst, dport)) = tcp.addr
 
+        # We can not handle HTTPS
+        if 443 in [sport, dport]:
+            logging.warning("Ignoring HTTPS/SSL stream (%s:%s -> %s:%s)" % (src, sport, dst, dport))
+            return
+
         # data to server
-        server_data= tcp.server.data[:tcp.server.count]
+        server_data = tcp.server.data[:tcp.server.count]
         # data to client
         client_data = tcp.client.data[:tcp.client.count]
 
@@ -118,11 +123,10 @@ def processTcpStream(tcp):
                 full_uri = req.uri if req.uri.startswith("http://") else \
                     "http://%s:%d%s" % (host_hdr, dport, req.uri) if dport != 80 else \
                     "http://%s%s" % (host_hdr, req.uri)
-                logging.info(full_uri)
-
+                logging.info("Processing tcp stream for %s", full_uri)
                 res = dpkt.http.Response(client_data)
                 logging.debug(res)
-                if res.headers.has_key("content-length"):
+                if "content-length" in res.headers:
                     body_len = int(res.headers["content-length"])
                     hdr_len = client_data.find('\r\n\r\n')
                     client_data = client_data[body_len + hdr_len + 4:]
@@ -131,31 +135,32 @@ def processTcpStream(tcp):
                     body_len = client_data[hdr_len:].find("HTTP/1")
                     client_data = client_data[hdr_len + body_len:]
 
-                if not resources.has_key(full_uri):
+                if not full_uri in resources:
                     resources[full_uri] = []
                 resources[full_uri].append(res)
 
                 server_data = server_data[len(req):]
             except Exception as ex:
-                logging.error("Failed to parse {}. Exception: ".format("response" if req_parsed else "request", str(ex)))
-                logging.error("Stopping processing of TCP stream %s:%s -> %s:%s" % (src,sport,dst,dport))
+                logging.error("Failed to parse {}. Exception: {}".format("response" if req_parsed else "request", str(ex)))
+                logging.error("Stopping processing of TCP stream %s:%s -> %s:%s (%s)" % (src, sport, dst, dport, full_uri))
                 break
+
 
 def get_resource(uri):
     # exact match?
-    if resources.has_key(uri):
+    if uri in resources:
         return resources[uri][0]
 
     resources_by_domain = {}
-    for u in resources.keys():
+    for u in resources:
         domain = urlparse.urlparse(u).hostname
-        if not resources_by_domain.has_key(domain):
+        if not domain in resources_by_domain:
             resources_by_domain[domain] = []
         resources_by_domain[domain].append(u)
 
     uri_domain = urlparse.urlparse(uri).hostname
     uri_path = urlparse.urlparse(uri).path
-    if resources_by_domain.has_key(uri_domain):
+    if uri_domain in resources_by_domain:
         # do we have one page from the same domain of the requested uri?
         if len(resources_by_domain[uri_domain]) == 1:
             logging.info("Matching %s with %s (one url from requested domain)", uri, resources_by_domain[uri_domain][0])
@@ -173,9 +178,9 @@ def get_resource(uri):
 ########################
 # HTTP proxy
 ########################
-
 class ProxyServer(SocketServer.TCPServer):
     allow_reuse_address = True
+
 
 class ProxyRequestHandler(SocketServer.BaseRequestHandler):
 
@@ -199,7 +204,7 @@ class ProxyRequestHandler(SocketServer.BaseRequestHandler):
         total_data = data = sock.recv(16384)
         while 1:
             try:
-                http_req = dpkt.http.Request(total_data)    
+                http_req = dpkt.http.Request(total_data)
                 return http_req
             except dpkt.NeedData:
                 data = sock.recv(16384)
@@ -208,7 +213,6 @@ class ProxyRequestHandler(SocketServer.BaseRequestHandler):
             except:
                 "Error while processing HTTP Request!"
                 return None
-
 
     @staticmethod
     def sendResponse(resp, conn):
@@ -250,9 +254,9 @@ def main():
         log_level = logging.DEBUG
     logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
 
-    # setup the reassembler            
-    nids.param("scan_num_hosts", 0) # disable portscan detection
-    nids.chksum_ctl([('0.0.0.0/0', False)]) # disable checksum verification: jsunpack says it may cause missed traffic
+    # setup the reassembler
+    nids.param("scan_num_hosts", 0)  # disable portscan detection
+    nids.chksum_ctl([('0.0.0.0/0', False)])  # disable checksum verification: jsunpack says it may cause missed traffic
     nids.param("filename", args.PCAP)
     nids.init()
     nids.register_tcp(reassembleTcpStream)
@@ -265,10 +269,10 @@ def main():
         processTcpStream(stream)
 
     # run proxy server
-    server = ProxyServer( (HOST,PORT), ProxyRequestHandler)
+    server = ProxyServer((HOST, PORT), ProxyRequestHandler)
     server.allow_reuse_address = True
     try:
-	logging.info("Proxy listening on %s:%d" % (HOST,PORT))
+        logging.info("Proxy listening on %s:%d" % (HOST, PORT))
         server.serve_forever()
     except KeyboardInterrupt:
         return 0
